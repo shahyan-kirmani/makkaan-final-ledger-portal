@@ -9,7 +9,7 @@ import sideImage from "../assets/images/Avenue18.jpg";
 export default function Register({ setSession }) {
   const navigate = useNavigate();
 
-  const API_BASE = import.meta.env.VITE_API_BASE || "http://143.110.246.210:5050";
+  const API_BASE = import.meta.env.VITE_API_BASE || "https://makkaandevelopments.online";
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
