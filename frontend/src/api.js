@@ -1,5 +1,5 @@
 import axios from "axios";
-export const API_BASE = "http://143.110.246.210:5050";
+export const API_BASE = "https://makkaandevelopments.online:5050";
 
 export function api(token) {
   const a = axios.create({ baseURL: API_BASE });
