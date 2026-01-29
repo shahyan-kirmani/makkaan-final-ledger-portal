@@ -16,7 +16,7 @@ import { CSS } from "@dnd-kit/utilities";
 const fmt = (n) => `Rs. ${Number(n || 0).toLocaleString("en-PK")}`;
 
 const BACKEND_ORIGIN =
-  import.meta?.env?.VITE_API_ORIGIN || "http://localhost:5050";
+  import.meta?.env?.VITE_API_ORIGIN || "https://makkaandevelopments.online";
 
 function fileUrl(u) {
   if (!u) return "";
