@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { getAuth, clearAuth } from "./auth";
 
 import Login from "./Pages/Login";
-import Register from "./Pages/register";
+import Register from "./Pages/Register";
 
 import AdminDashboard from "./Pages/AdminDashboard";
 import AdminClients from "./Pages/AdminClients";

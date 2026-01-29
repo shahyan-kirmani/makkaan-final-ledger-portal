@@ -82,14 +82,45 @@ const Select = (props) => (
 
 /* -------------------- NORMALIZE SERVER FIELDS -------------------- */
 function normalizeClient(raw) {
-  const downPayment =
-    raw?.downPayment ??
-    raw?.downpayment ??
-    raw?.down_payment ??
-    raw?.down_payment_amount ??
-    raw?.down_payment_amt ??
+  // TOTAL AMOUNT
+  const totalAmount =
+    raw?.totalAmount ??
+    raw?.total_amount ??
+    raw?.total_price ??
+    raw?.totalPrice ??
+    raw?.total ??
+    raw?.amount ??
     0;
 
+  const total = Number(totalAmount || 0);
+
+  // DOWN PAYMENT (amount) - try direct first
+  let downPayment =
+    raw?.downPayment ??
+    raw?.down_payment ??
+    raw?.downpayment ??
+    raw?.down_payment_amount ??
+    raw?.downpayment_amount ??
+    raw?.down_payment_amt ??
+    raw?.downpayment_amt ??
+    raw?.dp ??
+    null;
+
+  // DOWN PAYMENT % fallback
+  const dpPct =
+    raw?.downpaymentPct ??
+    raw?.downpayment_pct ??
+    raw?.down_payment_pct ??
+    raw?.downPaymentPct ??
+    0;
+
+  if (downPayment == null || Number(downPayment) === 0) {
+    const pct = Number(dpPct || 0);
+    if (total > 0 && pct > 0) downPayment = Math.round((total * pct) / 100);
+    else downPayment = 0;
+  }
+
+  // POSSESSION %
   const possession =
     raw?.possession ??
     raw?.possessionPct ??
@@ -97,22 +128,67 @@ function normalizeClient(raw) {
     raw?.possession_percent ??
     0;
 
-  const totalAmount =
-    raw?.totalAmount ??
-    raw?.total_price ??
-    raw?.totalPrice ??
-    raw?.total ??
-    raw?.amount ??
-    0;
-
   const months = raw?.months ?? raw?.duration ?? raw?.tenure ?? 0;
+
+  // ✅ normalize personal fields (supports different backend keys)
+  const email =
+    raw?.email ??
+    raw?.clientEmail ??
+    raw?.client_email ??
+    raw?.userEmail ??
+    raw?.user_email ??
+    raw?.client?.email ??
+    "";
+
+  const phone =
+    raw?.phone ??
+    raw?.phoneNumber ??
+    raw?.phone_number ??
+    raw?.mobile ??
+    raw?.mobileNumber ??
+    raw?.mobile_number ??
+    raw?.clientPhone ??
+    raw?.client_phone ??
+    raw?.client?.phone ??
+    raw?.client?.phoneNumber ??
+    raw?.client?.mobile ??
+    "";
+
+  const cnic =
+    raw?.cnic ??
+    raw?.cnicNumber ??
+    raw?.cnic_number ??
+    raw?.clientCnic ??
+    raw?.client_cnic ??
+    raw?.client?.cnic ??
+    raw?.client?.cnicNumber ??
+    "";
+
+  const address =
+    raw?.address ??
+    raw?.clientAddress ??
+    raw?.client_address ??
+    raw?.fullAddress ??
+    raw?.full_address ??
+    raw?.client?.address ??
+    raw?.client?.fullAddress ??
+    "";
+
+  // ✅✅✅ ONLY FIX ADDED: make sure contractId is always available
+  // Prisma contract primary key is `id`, so list endpoint may return `id` not `contractId`
+  const contractId = raw?.contractId ?? raw?.id ?? raw?.contract?.id ?? null;
 
   return {
     ...raw,
+    contractId, // ✅ important for edit fetch: /api/admin/clients/:contractId
+    totalAmount: total,
     downPayment: Number(downPayment || 0),
     possession: Number(possession || 0),
-    totalAmount: Number(totalAmount || 0),
     months: Number(months || 0),
+    email,
+    phone,
+    cnic,
+    address,
   };
 }
 
@@ -131,20 +207,16 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
 
   const fmt = (n) => `Rs. ${Number(n || 0).toLocaleString()}`;
 
-  /* ===================== INSTALLMENT PROGRESS ===================== */
-  // ✅ Option A (recommended): server sends these
   const paidInstallments = Number(c.paidInstallments || 0);
   const totalInstallments =
     Number(c.totalInstallments || 0) || Number(months || 0);
 
-  // ✅ Option B fallback: server sends paidAmount
   const paidAmount = Number(c.paidAmount || 0);
 
-  // Prefer count-based progress, else amount-based
   const progressPct = useMemo(() => {
     if (totalInstallments > 0) {
       return Math.round(
-        (Math.max(0, paidInstallments) / totalInstallments) * 100
+        (Math.max(0, paidInstallments) / totalInstallments) * 100,
       );
     }
     if (total > 0) {
@@ -155,13 +227,11 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
 
   const safePct = Math.max(0, Math.min(100, progressPct));
 
-  // Progress label text
   const progressText =
     totalInstallments > 0
       ? `${paidInstallments}/${totalInstallments} installments`
       : `${fmt(paidAmount)} paid`;
 
-  /* ===================== SMALL UI HELPERS ===================== */
   const chip = (text) => (
     <span
       style={{
@@ -182,7 +252,6 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
     </span>
   );
 
-  // ✅ COLORED STAT BOXES
   const Stat = ({ label, value, tone = "blue" }) => {
     const tones = {
       blue: {
@@ -290,7 +359,6 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
         e.currentTarget.style.borderColor = "rgba(148,163,184,.35)";
       }}
     >
-      {/* decorative glow */}
       <div
         style={{
           position: "absolute",
@@ -305,8 +373,9 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
         }}
       />
 
-      {/* TOP HEADER */}
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12 }}>
+      <div
+        style={{ display: "flex", justifyContent: "space-between", gap: 12 }}
+      >
         <div style={{ minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div
@@ -316,8 +385,7 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
                 borderRadius: 14,
                 display: "grid",
                 placeItems: "center",
-                background:
-                  "linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)",
+                background: "linear-gradient(135deg, #2563eb 0%, #60a5fa 100%)",
                 color: "white",
                 fontWeight: 900,
                 flex: "0 0 auto",
@@ -377,54 +445,6 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
         </span>
       </div>
 
-      {/* ✅ INSTALLMENT PROGRESS */}
-      <div style={{ marginTop: 14 }}>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            marginBottom: 8,
-          }}
-        >
-          <div style={{ fontSize: 12, fontWeight: 900, color: "#334155" }}>
-            Installment Progress
-          </div>
-          <div style={{ fontSize: 12, fontWeight: 900, color: "#0f172a" }}>
-            {safePct}% • {progressText}
-          </div>
-        </div>
-
-        <div
-          style={{
-            width: "100%",
-            height: 12,
-            borderRadius: 999,
-            background: "rgba(99,102,241,.10)",
-            border: "1px solid rgba(148,163,184,.35)",
-            overflow: "hidden",
-          }}
-        >
-          <div
-            style={{
-              width: `${safePct}%`,
-              height: "100%",
-              background:
-                safePct >= 70
-                  ? "linear-gradient(90deg, #22c55e 0%, #86efac 100%)"
-                  : safePct >= 35
-                  ? "linear-gradient(90deg, #2563eb 0%, #93c5fd 100%)"
-                  : "linear-gradient(90deg, #f59e0b 0%, #fde68a 100%)",
-              transition: "width .25s ease",
-            }}
-          />
-        </div>
-
-        <div style={{ marginTop: 8, fontSize: 12, color: "#64748b", fontWeight: 700 }}>
-          More paid installments → bar fills automatically.
-        </div>
-      </div>
-
-      {/* STATS GRID (COLORED) */}
       <div
         style={{
           marginTop: 14,
@@ -439,7 +459,6 @@ function ClientCard({ c, onEdit, onLedger, onDelete }) {
         <Stat label="Duration" value={`${months} months`} tone="slate" />
       </div>
 
-      {/* ACTIONS */}
       <div
         style={{
           display: "flex",
@@ -495,6 +514,7 @@ export default function AdminClients({ token, user, onLogout }) {
     email: "",
     phone: "",
     cnic: "",
+    address: "",
     password: "",
     project: "Avenue 18",
     unitNumber: "",
@@ -507,10 +527,78 @@ export default function AdminClients({ token, user, onLogout }) {
     bookingDate: "",
   });
 
+  const [editOriginal, setEditOriginal] = useState(null);
+
+  async function enrichInstallmentProgress(list) {
+    const results = await Promise.allSettled(
+      list.map(async (c) => {
+        const contractId = c.contractId;
+        if (!contractId) return { contractId, paid: 0 };
+
+        const r = await client.get(`/api/admin/ledger/${contractId}`);
+        const rows = r.data?.rows || [];
+
+        let paidCount = 0;
+        for (const row of rows) {
+          const inst = Number(row.installmentAmount || 0);
+          const parentPaid = Number(row.amountPaid || 0);
+          const childPaid = (row.children || []).reduce(
+            (s, ch) => s + Number(ch.amountPaid || 0),
+            0,
+          );
+          const totalPaid = parentPaid + childPaid;
+          if (inst > 0 && totalPaid >= inst) paidCount += 1;
+        }
+
+        return { contractId, paid: paidCount };
+      }),
+    );
+
+    const map = new Map();
+    for (const r of results) {
+      if (r.status === "fulfilled") map.set(r.value.contractId, r.value.paid);
+    }
+
+    return list.map((c) => ({
+      ...c,
+      paidInstallments: map.get(c.contractId) || 0,
+      totalInstallments: Number(c.months || 0),
+    }));
+  }
+
+  async function enrichDownPayments(list) {
+    const results = await Promise.allSettled(
+      list.map(async (c) => {
+        const contractId = c.contractId;
+        if (!contractId) return { contractId, downPayment: 0 };
+
+        const r = await client.get(`/api/admin/ledger/${contractId}`);
+        const dp = Number(r.data?.contract?.downPayment || 0);
+
+        return { contractId, downPayment: dp };
+      }),
+    );
+
+    const map = new Map();
+    for (const x of results) {
+      if (x.status === "fulfilled")
+        map.set(x.value.contractId, x.value.downPayment);
+    }
+    return list.map((c) => ({
+      ...c,
+      downPayment: map.get(c.contractId) ?? c.downPayment ?? 0,
+    }));
+  }
+
   async function load() {
     const res = await client.get("/api/admin/clients");
     const list = Array.isArray(res.data) ? res.data : [];
-    setClients(list.map(normalizeClient));
+
+    const normalized = list.map(normalizeClient);
+    const withRealDownPayment = await enrichDownPayments(normalized);
+    const withProgress = await enrichInstallmentProgress(withRealDownPayment);
+
+    setClients(withProgress);
   }
 
   useEffect(() => {
@@ -521,12 +609,14 @@ export default function AdminClients({ token, user, onLogout }) {
   function openCreate() {
     setMode("create");
     setEditTarget(null);
+    setEditOriginal(null);
     setMsg("");
     setForm({
       fullName: "",
       email: "",
       phone: "",
       cnic: "",
+      address: "",
       password: "",
       project: "Avenue 18",
       unitNumber: "",
@@ -541,18 +631,31 @@ export default function AdminClients({ token, user, onLogout }) {
     setOpen(true);
   }
 
-  function openEdit(rawC) {
-    const c = normalizeClient(rawC);
+  async function fetchClientDetails(contractId) {
+    try {
+      const r = await client.get(`/api/admin/clients/${contractId}`);
+      return r.data;
+    } catch {
+      return null;
+    }
+  }
+
+  async function openEdit(rawC) {
+    const base = normalizeClient(rawC);
 
     setMode("edit");
-    setEditTarget(c);
+    setEditTarget(base);
     setMsg("");
 
-    setForm({
+    const full = await fetchClientDetails(base.contractId);
+    const c = normalizeClient(full || base);
+
+    const nextForm = {
       fullName: c.clientName || "",
       email: c.email || "",
       phone: c.phone || "",
       cnic: c.cnic || "",
+      address: c.address || "",
       password: "",
 
       project: c.project || "Avenue 18",
@@ -565,9 +668,48 @@ export default function AdminClients({ token, user, onLogout }) {
       possession: String(c.possession || 0),
       months: String(c.months || ""),
       bookingDate: c.bookingDate?.slice(0, 10) || "",
-    });
+    };
 
+    setForm(nextForm);
+    setEditOriginal(nextForm);
     setOpen(true);
+  }
+
+  function buildOnlyChangedPayload() {
+    const base = editOriginal || {};
+    const diff = {};
+
+    const same = (a, b) => String(a ?? "") === String(b ?? "");
+
+    if (!same(form.fullName.trim(), base.fullName))
+      diff.fullName = form.fullName.trim();
+    if (!same(form.email.trim(), base.email)) diff.email = form.email.trim();
+    if (!same(form.phone.trim(), base.phone)) diff.phone = form.phone.trim();
+    if (!same(form.cnic.trim(), base.cnic))
+      diff.cnic = form.cnic.trim() ? form.cnic.trim() : null;
+    if (!same(form.address.trim(), base.address))
+      diff.address = form.address.trim();
+
+    if (!same(form.project, base.project)) diff.project = form.project;
+    if (!same(form.unitNumber.trim(), base.unitNumber))
+      diff.unitNumber = form.unitNumber.trim();
+    if (!same(form.unitType, base.unitType)) diff.unitType = form.unitType;
+    if (!same(form.status, base.status)) diff.status = form.status;
+
+    if (Number(form.totalPrice || 0) !== Number(base.totalPrice || 0))
+      diff.totalAmount = Number(form.totalPrice || 0);
+    if (Number(form.downPayment || 0) !== Number(base.downPayment || 0))
+      diff.downPayment = Number(form.downPayment || 0);
+    if (Number(form.possession || 0) !== Number(base.possession || 0))
+      diff.possession = Number(form.possession || 0);
+    if (Number(form.months || 0) !== Number(base.months || 0))
+      diff.months = Number(form.months || 0);
+
+    const bdNow = form.bookingDate ? form.bookingDate : "";
+    const bdOld = base.bookingDate ? base.bookingDate : "";
+    if (!same(bdNow, bdOld)) diff.bookingDate = bdNow ? bdNow : null;
+
+    return diff;
   }
 
   async function submit() {
@@ -589,31 +731,40 @@ export default function AdminClients({ token, user, onLogout }) {
     try {
       setSaving(true);
 
-      const payload = {
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        phone: form.phone.trim(),
-        cnic: form.cnic ? form.cnic.trim() : null,
-
-        project: form.project || "Avenue 18",
-        unitNumber: form.unitNumber.trim(),
-        unitType: form.unitType,
-        status: form.status,
-
-        totalAmount: Number(form.totalPrice),
-        downPayment: Number(form.downPayment || 0),
-        possession: Number(form.possession || 0),
-        months: Number(form.months),
-        bookingDate: form.bookingDate ? form.bookingDate : null,
-      };
-
       if (mode === "create") {
+        const payload = {
+          fullName: form.fullName.trim(),
+          email: form.email.trim(),
+          phone: form.phone.trim(),
+          cnic: form.cnic ? form.cnic.trim() : null,
+          address: form.address ? form.address.trim() : "",
+
+          project: form.project || "Avenue 18",
+          unitNumber: form.unitNumber.trim(),
+          unitType: form.unitType,
+          status: form.status,
+
+          totalAmount: Number(form.totalPrice),
+          downPayment: Number(form.downPayment || 0),
+          possession: Number(form.possession || 0),
+          months: Number(form.months),
+          bookingDate: form.bookingDate ? form.bookingDate : null,
+        };
+
         await client.post("/api/admin/clients", {
           ...payload,
           password: form.password,
         });
       } else {
-        await client.put(`/api/admin/clients/${editTarget.contractId}`, payload);
+        const onlyChanged = buildOnlyChangedPayload();
+        if (Object.keys(onlyChanged).length === 0) {
+          setOpen(false);
+          return;
+        }
+        await client.put(
+          `/api/admin/clients/${editTarget.contractId}`,
+          onlyChanged,
+        );
       }
 
       setOpen(false);
@@ -628,9 +779,7 @@ export default function AdminClients({ token, user, onLogout }) {
   async function deleteClient(rawC) {
     const c = normalizeClient(rawC);
     const ok = window.confirm(
-      `Delete this client?\n\n${c.clientName || ""} • ${
-        c.unitNumber || ""
-      }\n\nThis action cannot be undone.`
+      `Delete this client?\n\n${c.clientName || ""} • ${c.unitNumber || ""}\n\nThis action cannot be undone.`,
     );
     if (!ok) return;
 
@@ -656,7 +805,7 @@ export default function AdminClients({ token, user, onLogout }) {
   const filtered = clients.filter((c) =>
     `${c.clientName} ${c.unitNumber} ${c.email} ${c.phone} ${c.cnic || ""}`
       .toLowerCase()
-      .includes(search.toLowerCase())
+      .includes(search.toLowerCase()),
   );
 
   return (
@@ -772,7 +921,9 @@ export default function AdminClients({ token, user, onLogout }) {
                 <Field label="Email" required>
                   <Input
                     value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, email: e.target.value })
+                    }
                     placeholder="Enter email"
                   />
                 </Field>
@@ -780,7 +931,9 @@ export default function AdminClients({ token, user, onLogout }) {
                 <Field label="Phone" required>
                   <Input
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, phone: e.target.value })
+                    }
                     placeholder="Enter phone number"
                   />
                 </Field>
@@ -792,6 +945,17 @@ export default function AdminClients({ token, user, onLogout }) {
                     placeholder="Enter CNIC"
                   />
                 </Field>
+
+                <Field label="Address">
+                  <Input
+                    value={form.address}
+                    onChange={(e) =>
+                      setForm({ ...form, address: e.target.value })
+                    }
+                    placeholder="Enter address"
+                  />
+                </Field>
+                <div />
 
                 {mode === "create" && (
                   <>
@@ -823,7 +987,9 @@ export default function AdminClients({ token, user, onLogout }) {
                 <Field label="Status">
                   <Select
                     value={form.status}
-                    onChange={(e) => setForm({ ...form, status: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, status: e.target.value })
+                    }
                   >
                     <option value="Active">Active</option>
                     <option value="Inactive">Inactive</option>
@@ -893,7 +1059,9 @@ export default function AdminClients({ token, user, onLogout }) {
                   <Input
                     type="number"
                     value={form.months}
-                    onChange={(e) => setForm({ ...form, months: e.target.value })}
+                    onChange={(e) =>
+                      setForm({ ...form, months: e.target.value })
+                    }
                     placeholder="e.g., 36"
                   />
                 </Field>
@@ -934,11 +1102,19 @@ export default function AdminClients({ token, user, onLogout }) {
                 )}
 
                 <div style={{ display: "flex", gap: 10 }}>
-                  <button className="btn secondary" onClick={() => setOpen(false)}>
+                  <button
+                    className="btn secondary"
+                    onClick={() => setOpen(false)}
+                  >
                     Cancel
                   </button>
+
                   <button className="btn" onClick={submit} disabled={saving}>
-                    {saving ? "Saving..." : mode === "create" ? "Add Client" : "Save"}
+                    {saving
+                      ? "Saving..."
+                      : mode === "create"
+                        ? "Add Client"
+                        : "Update"}
                   </button>
                 </div>
               </div>

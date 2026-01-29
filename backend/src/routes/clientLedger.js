@@ -11,12 +11,11 @@ router.use(auth, requireRole("CLIENT"));
 // ✅ Put your Avenue 18 logo file here:
 const LOGO_PATH = path.join(
   __dirname,
-  "..",              // routes -> src
+  "..", // routes -> src
   "uploads",
   "payment-proofs",
-  "logoavenue18.png"
+  "logoavenue18.png",
 );
-
 
 function fmt(n) {
   const num = Number(n || 0);
@@ -40,14 +39,19 @@ function fmtDMY(d) {
 }
 
 function computeReceivable(rows) {
-  const sorted = [...(rows || [])].sort((a, b) => Number(a.srNo) - Number(b.srNo));
+  const sorted = [...(rows || [])].sort(
+    (a, b) => Number(a.srNo) - Number(b.srNo),
+  );
 
   let runningInstallment = 0;
   let runningPaid = 0;
 
   return sorted.map((r) => {
     const parentPaid = Number(r.amountPaid || 0);
-    const childPaid = (r.children || []).reduce((s, c) => s + Number(c.amountPaid || 0), 0);
+    const childPaid = (r.children || []).reduce(
+      (s, c) => s + Number(c.amountPaid || 0),
+      0,
+    );
     const totalPaid = parentPaid + childPaid;
 
     runningInstallment += Number(r.installmentAmount || 0);
@@ -115,7 +119,9 @@ router.get("/", async (req, res) => {
     });
   } catch (e) {
     console.error("CLIENT LEDGER ERROR:", e);
-    return res.status(500).json({ error: e.message || "Failed to fetch ledger" });
+    return res
+      .status(500)
+      .json({ error: e.message || "Failed to fetch ledger" });
   }
 });
 
@@ -153,7 +159,10 @@ router.get("/export/pdf", async (req, res) => {
       return s + Math.max(0, inst - paidAll);
     }, 0);
 
-    const totalSurcharge = rows.reduce((s, r) => s + Number(r.latePaymentSurcharge || 0), 0);
+    const totalSurcharge = rows.reduce(
+      (s, r) => s + Number(r.latePaymentSurcharge || 0),
+      0,
+    );
     const totalDue = totalReceivable + totalSurcharge;
 
     const printedOn = fmtDMY(new Date());
@@ -293,7 +302,7 @@ router.get("/export/pdf", async (req, res) => {
                 <td class="right">—</td>
                 <td class="right">—</td>
               </tr>
-            `
+            `,
             )
             .join("");
 

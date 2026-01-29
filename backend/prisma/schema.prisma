@@ -64,9 +64,8 @@ model ledgerrow {
   latePaymentSurcharge Int      @default(0) @map("LatePaymentSurcharge")
 
   // ✅ NEW: required to "lock" + keep surcharge saved correctly
-  // (so next save adds only the new cycle surcharge, not recalculating)
   surchargeCyclesApplied Int    @default(0)
-  surchargeBalanceBase   Int?   // keep nullable (null = not locked yet)
+  surchargeBalanceBase   Int?
 
   // instrument info
   instrumentType      String?
@@ -144,6 +143,9 @@ model user {
   cnic         String?
   phone        String?
 
+  // ✅ ADD THIS
+  address      String?   @db.VarChar(255)
+
   contract contract[]
   payment  payment[]
 }
@@ -151,4 +153,5 @@ model user {
 enum user_role {
   CLIENT
   ACQUISITION
+  
 }

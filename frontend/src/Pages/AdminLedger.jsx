@@ -3,7 +3,6 @@ import { useNavigate, useParams } from "react-router-dom";
 import SidebarLayout from "../layout/SidebarLayout";
 import { api } from "../api";
 
-
 // ✅ Drag & Drop libs
 import { DndContext, closestCenter } from "@dnd-kit/core";
 import {
@@ -81,7 +80,6 @@ function lateDays(dueDate, paymentDate) {
 
 // ✅ Late days = (paymentDate if exists else todayPK) - dueDate
 
-
 // ✅ If balance is still pending, keep counting late days till TODAY.
 // If fully paid, stop counting at the latest payment date.
 // ✅ Always count late days till TODAY (so next 30-day cycle can add again)
@@ -93,11 +91,7 @@ function lateDaysWhenPaid(dueDate, paymentDate) {
   return lateDays(dueDate, paymentDate || "");
 }
 
-
-
-
 // ✅ surcharge cycles count: 0-29 =>0, 30-59=>1, 60-89=>2 ...
-
 
 // ✅ surcharge cycles count: 0-29 =>0, 30-59=>1, 60-89=>2 ...
 function cyclesFromLateDays(days) {
@@ -125,7 +119,6 @@ function makeBlock({ cycle, balance }) {
     lockedAt: new Date().toISOString().slice(0, 10),
   };
 }
-
 
 function ordinal(n) {
   const s = ["th", "st", "nd", "rd"],
@@ -171,7 +164,6 @@ function displayBalanceForRow(row) {
   return paid > 0 ? remaining : 0;
 }
 
-
 function computeRowSurchargeDisplay(row) {
   const inst = Number(row.installmentAmount || 0);
 
@@ -186,9 +178,7 @@ function computeRowSurchargeDisplay(row) {
 
   // ✅ THIS is the key:
   // after first cycle, surcharge should be calculated on SAVED BALANCE, not the balance you just typed.
-  const savedBalance = Number(
-    row.surchargeBalanceBase ?? inst
-  );
+  const savedBalance = Number(row.surchargeBalanceBase ?? inst);
 
   const extraCycles = Math.max(0, previewCycles - baseCycles);
 
@@ -199,15 +189,18 @@ function computeRowSurchargeDisplay(row) {
   if (extraCycles > 0) {
     const hasSavedPayment = savedBalance < inst;
 
-for (let c = baseCycles + 1; c <= previewCycles; c++) {
-  const baseForThisCycle =
-    !hasSavedPayment ? inst : c === 1 ? inst : savedBalance;
+    for (let c = baseCycles + 1; c <= previewCycles; c++) {
+      const baseForThisCycle = !hasSavedPayment
+        ? inst
+        : c === 1
+          ? inst
+          : savedBalance;
 
-  previewAdd += baseForThisCycle > 0
-    ? Math.round((SURCHARGE_PCT / 100) * baseForThisCycle)
-    : 0;
-}
-
+      previewAdd +=
+        baseForThisCycle > 0
+          ? Math.round((SURCHARGE_PCT / 100) * baseForThisCycle)
+          : 0;
+    }
   }
 
   return {
@@ -218,7 +211,6 @@ for (let c = baseCycles + 1; c <= previewCycles; c++) {
     previewAdd,
   };
 }
-
 
 function computePossessionSurchargeDisplay({
   possessionAmount,
@@ -258,8 +250,6 @@ function computePossessionSurchargeDisplay({
     balance,
   };
 }
-
-
 
 function Input(props) {
   return (
@@ -490,11 +480,10 @@ export default function AdminLedger({ token, user, onLogout }) {
   const [posPaymentProof, setPosPaymentProof] = useState("");
   const [posSurchargeLockedAmount, setPosSurchargeLockedAmount] = useState(0);
   const [posSurchargeLockedBase, setPosSurchargeLockedBase] = useState(0);
-const [posSurchargeCyclesBase, setPosSurchargeCyclesBase] = useState(0);
+  const [posSurchargeCyclesBase, setPosSurchargeCyclesBase] = useState(0);
 
   const [posSurchargeCyclesApplied, setPosSurchargeCyclesApplied] = useState(0);
   const [posSurchargeBlocks, setPosSurchargeBlocks] = useState([]);
-
 
   const didInitEdits = useRef(false);
 
@@ -503,41 +492,43 @@ const [posSurchargeCyclesBase, setPosSurchargeCyclesBase] = useState(0);
   const [rowOrder, setRowOrder] = useState([]);
 
   function withKeys(list) {
-  return (list || []).map((r) => {
-    const lockedFromDb = Number(
-      r.latePaymentSurcharge ?? r.LatePaymentSurcharge ?? 0
-    );
+    return (list || []).map((r) => {
+      const lockedFromDb = Number(
+        r.latePaymentSurcharge ?? r.LatePaymentSurcharge ?? 0,
+      );
 
-    return {
-      ...r,
-      __key:
-        r.__key ||
-        (r.id ? `id-${r.id}` : `tmp-${crypto.randomUUID?.() || Date.now()}`),
+      return {
+        ...r,
+        __key:
+          r.__key ||
+          (r.id ? `id-${r.id}` : `tmp-${crypto.randomUUID?.() || Date.now()}`),
 
-      // ✅ ALWAYS keep locked surcharge from DB
-      surchargeLockedAmount: Number(r.surchargeLockedAmount || lockedFromDb || 0),
-      surchargeCyclesApplied: Number(r.surchargeCyclesApplied || 0),
-      surchargeLockedAt: r.surchargeLockedAt || null,
+        // ✅ ALWAYS keep locked surcharge from DB
+        surchargeLockedAmount: Number(
+          r.surchargeLockedAmount || lockedFromDb || 0,
+        ),
+        surchargeCyclesApplied: Number(r.surchargeCyclesApplied || 0),
+        surchargeLockedAt: r.surchargeLockedAt || null,
 
-      // ✅ base (saved) snapshot — Save se pehle yahi fixed rahega
-surchargeLockedBase: Number(r.surchargeLockedAmount || lockedFromDb || 0),
-surchargeCyclesBase: Number(r.surchargeCyclesApplied || 0),
+        // ✅ base (saved) snapshot — Save se pehle yahi fixed rahega
+        surchargeLockedBase: Number(
+          r.surchargeLockedAmount || lockedFromDb || 0,
+        ),
+        surchargeCyclesBase: Number(r.surchargeCyclesApplied || 0),
 
+        // ✅ saved balance snapshot (used for next cycles after first)
+        surchargeBalanceBase: Number(
+          r.surchargeBalanceBase ??
+            Math.max(0, Number(r.installmentAmount || 0) - effectivePaid(r)),
+        ),
 
-
-// ✅ saved balance snapshot (used for next cycles after first)
-surchargeBalanceBase: Number(
-  r.surchargeBalanceBase ??
-  Math.max(0, Number(r.installmentAmount || 0) - effectivePaid(r))
-),
-
-      // ✅ keep blocks safe
-      surchargeBlocks: Array.isArray(r.surchargeBlocks) ? r.surchargeBlocks : [],
-
-      
-    };
-  });
-}
+        // ✅ keep blocks safe
+        surchargeBlocks: Array.isArray(r.surchargeBlocks)
+          ? r.surchargeBlocks
+          : [],
+      };
+    });
+  }
 
   async function load() {
     setLoading(true);
@@ -556,21 +547,36 @@ surchargeBalanceBase: Number(
       setMonthsEdit(Number(c?.months || 0));
 
       // ✅ init POSSESSION fields (if backend returns them; else safe defaults)
-      setPosDueDate(c?.possessionDueDate ? String(c.possessionDueDate).slice(0, 10) : "");
+      setPosDueDate(
+        c?.possessionDueDate ? String(c.possessionDueDate).slice(0, 10) : "",
+      );
       setPosPaid(Number(c?.possessionPaid || 0));
-      setPosPaymentDate(c?.possessionPaymentDate ? String(c.possessionPaymentDate).slice(0, 10) : "");
+      setPosPaymentDate(
+        c?.possessionPaymentDate
+          ? String(c.possessionPaymentDate).slice(0, 10)
+          : "",
+      );
       setPosInstrumentType(c?.possessionInstrumentType || "");
       setPosInstrumentNo(c?.possessionInstrumentNo || "");
       setPosPaymentProof(c?.possessionPaymentProof || "");
-      setPosSurchargeLockedAmount(Number(c?.possessionSurchargeLockedAmount || 0));
-      setPosSurchargeCyclesApplied(Number(c?.possessionSurchargeCyclesApplied || 0));
-      setPosSurchargeLockedBase(Number(c?.possessionSurchargeLockedAmount || 0));
-setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
+      setPosSurchargeLockedAmount(
+        Number(c?.possessionSurchargeLockedAmount || 0),
+      );
+      setPosSurchargeCyclesApplied(
+        Number(c?.possessionSurchargeCyclesApplied || 0),
+      );
+      setPosSurchargeLockedBase(
+        Number(c?.possessionSurchargeLockedAmount || 0),
+      );
+      setPosSurchargeCyclesBase(
+        Number(c?.possessionSurchargeCyclesApplied || 0),
+      );
 
       setPosSurchargeBlocks(
-  Array.isArray(c?.possessionSurchargeBlocks) ? c.possessionSurchargeBlocks : []
-);
-
+        Array.isArray(c?.possessionSurchargeBlocks)
+          ? c.possessionSurchargeBlocks
+          : [],
+      );
 
       // ✅ init order (rows + possession if enabled)
       const baseKeys = (r || []).map((x) => x.__key);
@@ -599,7 +605,10 @@ setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
   const possessionPct = Number(possessionPctEdit || 0);
 
   const possessionAmount = Math.round((totalAmount * possessionPct) / 100);
-  const monthlyTotal = Math.max(0, totalAmount - downPayment - possessionAmount);
+  const monthlyTotal = Math.max(
+    0,
+    totalAmount - downPayment - possessionAmount,
+  );
 
   // ✅ Keep rowOrder synced with rows + possession toggle
   useEffect(() => {
@@ -629,101 +638,96 @@ setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
   // Every time late days cross another 30-day block, add NEW surcharge:
   // previousLocked + (5% of CURRENT balance) * (newCycles)
   // ✅✅ 30-DAY SURCHARGE ACCUMULATOR FOR INSTALLMENT ROWS
-// Rule:
-// - First surcharge ONLY after BOTH DueDate + PaymentDate exist.
-// - Late days = DueDate -> LatestPaymentDate (parent/child)
-// - Each 30-day boundary adds 5% of CURRENT balance (after payments)
-// useEffect(() => {
-//   setRows((prev) => {
-//     let changed = false;
+  // Rule:
+  // - First surcharge ONLY after BOTH DueDate + PaymentDate exist.
+  // - Late days = DueDate -> LatestPaymentDate (parent/child)
+  // - Each 30-day boundary adds 5% of CURRENT balance (after payments)
+  // useEffect(() => {
+  //   setRows((prev) => {
+  //     let changed = false;
 
-//     const next = prev.map((r) => {
-//       const inst = Number(r.installmentAmount || 0);
-//       if (inst <= 0) return r;
+  //     const next = prev.map((r) => {
+  //       const inst = Number(r.installmentAmount || 0);
+  //       if (inst <= 0) return r;
 
-//       // ✅ Paid includes parent + children
-//       const paid = effectivePaid(r);
-//       const balance = Math.max(0, inst - paid);
+  //       // ✅ Paid includes parent + children
+  //       const paid = effectivePaid(r);
+  //       const balance = Math.max(0, inst - paid);
 
-//       // ✅ latest payment date among parent + child
-//       const payDate = effectivePaymentDate(r);
+  //       // ✅ latest payment date among parent + child
+  //       const payDate = effectivePaymentDate(r);
 
-//       // ✅ IMPORTANT: if no payment date => no surcharge at all
-//       const daysLate = lateDaysWhenPaid(r.dueDate, payDate);
-//       const shouldHaveCycles = cyclesFromLateDays(daysLate);
+  //       // ✅ IMPORTANT: if no payment date => no surcharge at all
+  //       const daysLate = lateDaysWhenPaid(r.dueDate, payDate);
+  //       const shouldHaveCycles = cyclesFromLateDays(daysLate);
 
-//       const applied = Number(r.surchargeCyclesApplied || 0);
-//       if (shouldHaveCycles <= applied) return r;
+  //       const applied = Number(r.surchargeCyclesApplied || 0);
+  //       if (shouldHaveCycles <= applied) return r;
 
-//       const prevLocked = Number(r.surchargeLockedAmount || 0);
-//       const cyclesToAdd = shouldHaveCycles - applied;
+  //       const prevLocked = Number(r.surchargeLockedAmount || 0);
+  //       const cyclesToAdd = shouldHaveCycles - applied;
 
-//       let add = 0;
-//       for (let i = 0; i < cyclesToAdd; i++) {
-//         add += balance > 0 ? Math.round((SURCHARGE_PCT / 100) * balance) : 0;
-//       }
+  //       let add = 0;
+  //       for (let i = 0; i < cyclesToAdd; i++) {
+  //         add += balance > 0 ? Math.round((SURCHARGE_PCT / 100) * balance) : 0;
+  //       }
 
-//       changed = true;
-//       return {
-//         ...r,
-//         surchargeLockedAmount: prevLocked + add,
-//         surchargeCyclesApplied: shouldHaveCycles,
-//         surchargeLockedAt: new Date().toISOString().slice(0, 10),
-//       };
-//     });
+  //       changed = true;
+  //       return {
+  //         ...r,
+  //         surchargeLockedAmount: prevLocked + add,
+  //         surchargeCyclesApplied: shouldHaveCycles,
+  //         surchargeLockedAt: new Date().toISOString().slice(0, 10),
+  //       };
+  //     });
 
-//     return changed ? next : prev;
-//   });
-// }, [rows]);
-
-
-
+  //     return changed ? next : prev;
+  //   });
+  // }, [rows]);
 
   // ✅✅ 30-DAY SURCHARGE ACCUMULATOR FOR POSSESSION (separate state)
- // ✅✅ 30-DAY SURCHARGE ACCUMULATOR FOR POSSESSION (separate state)
-// useEffect(() => {
-//   if (possessionPctEdit <= 0) return;
-//   if (!posDueDate) return;
+  // ✅✅ 30-DAY SURCHARGE ACCUMULATOR FOR POSSESSION (separate state)
+  // useEffect(() => {
+  //   if (possessionPctEdit <= 0) return;
+  //   if (!posDueDate) return;
 
-//   const inst = Number(possessionAmount || 0);
-//   const paid = Number(posPaid || 0);
-//   const balance = Math.max(0, inst - paid);
+  //   const inst = Number(possessionAmount || 0);
+  //   const paid = Number(posPaid || 0);
+  //   const balance = Math.max(0, inst - paid);
 
-//   // ✅ First surcharge only when BOTH due date + payment date exist
-//   const daysLate = lateDaysWhenPaid(posDueDate, posPaymentDate);
+  //   // ✅ First surcharge only when BOTH due date + payment date exist
+  //   const daysLate = lateDaysWhenPaid(posDueDate, posPaymentDate);
 
-//   const shouldHaveCycles = cyclesFromLateDays(daysLate);
-//   const applied = Number(posSurchargeCyclesApplied || 0);
+  //   const shouldHaveCycles = cyclesFromLateDays(daysLate);
+  //   const applied = Number(posSurchargeCyclesApplied || 0);
 
-//   if (shouldHaveCycles <= applied) return;
+  //   if (shouldHaveCycles <= applied) return;
 
-//   const cyclesToAdd = shouldHaveCycles - applied;
+  //   const cyclesToAdd = shouldHaveCycles - applied;
 
-//   setPosSurchargeBlocks((prev) => {
-//     const blocks = Array.isArray(prev) ? [...prev] : [];
+  //   setPosSurchargeBlocks((prev) => {
+  //     const blocks = Array.isArray(prev) ? [...prev] : [];
 
-//     for (let i = 1; i <= cyclesToAdd; i++) {
-//       const cycleNo = applied + i;
-//       blocks.push(makeBlock({ cycle: cycleNo, balance }));
-//     }
+  //     for (let i = 1; i <= cyclesToAdd; i++) {
+  //       const cycleNo = applied + i;
+  //       blocks.push(makeBlock({ cycle: cycleNo, balance }));
+  //     }
 
-//     const newTotal = sumBlocks(blocks);
-//     setPosSurchargeLockedAmount(newTotal);
-//     return blocks;
-//   });
+  //     const newTotal = sumBlocks(blocks);
+  //     setPosSurchargeLockedAmount(newTotal);
+  //     return blocks;
+  //   });
 
-//   setPosSurchargeCyclesApplied(shouldHaveCycles);
-//   // eslint-disable-next-line
-// }, [
-//   possessionPctEdit,
-//   possessionAmount,
-//   posDueDate,
-//   posPaid,
-//   posPaymentDate,
-//   posSurchargeCyclesApplied,
-// ]);
-
-
+  //   setPosSurchargeCyclesApplied(shouldHaveCycles);
+  //   // eslint-disable-next-line
+  // }, [
+  //   possessionPctEdit,
+  //   possessionAmount,
+  //   posDueDate,
+  //   posPaid,
+  //   posPaymentDate,
+  //   posSurchargeCyclesApplied,
+  // ]);
 
   async function downloadLedgerFile(type) {
     if (!contractId) return;
@@ -762,7 +766,7 @@ setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
       setMsg(
         e.response?.data?.error ||
           e.message ||
-          `Failed to download ${type.toUpperCase()}`
+          `Failed to download ${type.toUpperCase()}`,
       );
     } finally {
       if (isPdf) setDownloadingPdf(false);
@@ -773,7 +777,6 @@ setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
     if (!contract) return;
     if (!months || months <= 0) {
       setMsg("Months missing in contract");
-      
       return;
     }
 
@@ -783,36 +786,42 @@ setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
     const base = Math.floor(monthlyTotal / months);
     const remainder = monthlyTotal - base * months;
 
-    const start = contract.startDate ? new Date(contract.startDate) : new Date();
+    const start = contract.bookingDate
+      ? new Date(contract.bookingDate)
+      : new Date();
+
+    // Start from the next 1st of the month after the booking date
+    const firstInstallmentMonth = new Date(start);
+    firstInstallmentMonth.setMonth(firstInstallmentMonth.getMonth() + 1); // Go to next month
+    firstInstallmentMonth.setDate(1); // Set to 1st of the month
 
     const gen = Array.from({ length: months }).map((_, i) => {
       const srNo = i + 1;
       const inst = base + (i < remainder ? 1 : 0);
 
-      const due = new Date(start);
-      due.setMonth(due.getMonth() + i);
+      const due = new Date(firstInstallmentMonth);
+      due.setMonth(due.getMonth() + i); // Increment month for each installment
 
       const old = prevMap.get(srNo) || {};
 
       return {
         ...old,
-
-        // ✅ keep surcharge accumulator fields
-        // ✅ base snapshot must survive rebuild
-surchargeLockedBase: Number(old.surchargeLockedBase ?? old.surchargeLockedAmount ?? 0),
-surchargeCyclesBase: Number(old.surchargeCyclesBase ?? old.surchargeCyclesApplied ?? 0),
-
-
-surchargeBalanceBase: Number(
-  old.surchargeBalanceBase ??
-  Math.max(0, Number(old.installmentAmount || inst) - effectivePaid(old))
-),
-
-
+        surchargeLockedBase: Number(
+          old.surchargeLockedBase ?? old.surchargeLockedAmount ?? 0,
+        ),
+        surchargeCyclesBase: Number(
+          old.surchargeCyclesBase ?? old.surchargeCyclesApplied ?? 0,
+        ),
+        surchargeBalanceBase: Number(
+          old.surchargeBalanceBase ??
+            Math.max(
+              0,
+              Number(old.installmentAmount || inst) - effectivePaid(old),
+            ),
+        ),
         surchargeLockedAmount: Number(old.surchargeLockedAmount || 0),
         surchargeCyclesApplied: Number(old.surchargeCyclesApplied || 0),
         surchargeLockedAt: old.surchargeLockedAt || null,
-
         __key:
           old.__key ||
           (old.id
@@ -825,7 +834,7 @@ surchargeBalanceBase: Number(
         dueDate: old.dueDate
           ? String(old.dueDate).slice(0, 10)
           : due.toISOString().slice(0, 10),
-        amountPaid: old.amountPaid || 0, // parent paid (kept)
+        amountPaid: old.amountPaid || 0,
         paymentDate: old.paymentDate || "",
         paymentProof: old.paymentProof || "",
         instrumentType: old.instrumentType || "",
@@ -861,7 +870,6 @@ surchargeBalanceBase: Number(
   }
 
   function addRow() {
-    
     const nextSr = rows.length
       ? Math.max(...rows.map((r) => Number(r.srNo))) + 1
       : 1;
@@ -886,13 +894,12 @@ surchargeBalanceBase: Number(
 
         // ✅ surcharge accumulator fields
         surchargeLockedBase: 0,
-surchargeCyclesBase: 0,
+        surchargeCyclesBase: 0,
 
         surchargeLockedAmount: 0,
         surchargeCyclesApplied: 0,
         surchargeLockedAt: null,
         surchargeBlocks: [],
-
       },
     ]);
   }
@@ -1006,7 +1013,7 @@ surchargeCyclesBase: 0,
       const res = await client.post(
         `/api/admin/ledger/${contractId}/upload-proof`,
         fd,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
 
       const url = res?.data?.url;
@@ -1034,7 +1041,7 @@ surchargeCyclesBase: 0,
       const res = await client.post(
         `/api/admin/ledger/${contractId}/upload-proof`,
         fd,
-        { headers: { "Content-Type": "multipart/form-data" } }
+        { headers: { "Content-Type": "multipart/form-data" } },
       );
 
       const url = res?.data?.url;
@@ -1048,174 +1055,200 @@ surchargeCyclesBase: 0,
     }
   }
 
-
   async function deleteProofForRow(idx) {
-  try {
-    setMsg("");
+    try {
+      setMsg("");
 
-    const row = rows[idx];
-    if (!row) return;
+      const row = rows[idx];
+      if (!row) return;
 
-    // ✅ prefer rowId (best), fallback srNo
-    const payload = row.id
-      ? { rowId: Number(row.id) }
-      : { srNo: Number(row.srNo) };
+      // ✅ prefer rowId (best), fallback srNo
+      const payload = row.id
+        ? { rowId: Number(row.id) }
+        : { srNo: Number(row.srNo) };
 
-    await client.delete(`/api/admin/ledger/${contractId}/delete-proof`, {
-      data: payload,
-    });
+      await client.delete(`/api/admin/ledger/${contractId}/delete-proof`, {
+        data: payload,
+      });
 
-    updateRow(idx, { paymentProof: "" });
-    setMsg("Payment proof deleted ✅");
-  } catch (e) {
-    console.error(e);
-    setMsg(e.response?.data?.error || e.message || "Failed to delete proof");
+      updateRow(idx, { paymentProof: "" });
+      setMsg("Payment proof deleted ✅");
+    } catch (e) {
+      console.error(e);
+      setMsg(e.response?.data?.error || e.message || "Failed to delete proof");
+    }
   }
-}
 
+  async function deletePossessionProof() {
+    try {
+      setMsg("");
 
+      // ⚠️ This will only work if your backend supports POSSESSION proof.
+      // Right now your backend delete-proof expects ledgerrow rowId/srNo (number).
+      await client.delete(`/api/admin/ledger/${contractId}/delete-proof`, {
+        data: { srNo: "POSSESSION" },
+      });
 
-async function deletePossessionProof() {
-  try {
-    setMsg("");
-
-    // ⚠️ This will only work if your backend supports POSSESSION proof.
-    // Right now your backend delete-proof expects ledgerrow rowId/srNo (number).
-    await client.delete(`/api/admin/ledger/${contractId}/delete-proof`, {
-      data: { srNo: "POSSESSION" },
-    });
-
-    setPosPaymentProof("");
-    setMsg("Possession proof deleted ✅");
-  } catch (e) {
-    console.error(e);
-    setMsg(e.response?.data?.error || e.message || "Failed to delete proof");
+      setPosPaymentProof("");
+      setMsg("Possession proof deleted ✅");
+    } catch (e) {
+      console.error(e);
+      setMsg(e.response?.data?.error || e.message || "Failed to delete proof");
+    }
   }
-}
-
-
-
-  
 
   async function saveAll() {
-  setSaving(true);
-  setMsg("");
-  try {
-    // validate srNo unique
-    const set = new Set();
-    for (const r of rows) {
-      const sr = Number(r.srNo);
-      if (!sr) throw new Error("Each row needs Sr No");
-      if (set.has(sr)) throw new Error("Sr No must be unique");
-      set.add(sr);
+    setSaving(true);
+    setMsg("");
+    try {
+      // validate srNo unique
+      const set = new Set();
+      for (const r of rows) {
+        const sr = Number(r.srNo);
+        if (!sr) throw new Error("Each row needs Sr No");
+        if (set.has(sr)) throw new Error("Sr No must be unique");
+        set.add(sr);
 
-      // validate child lineNo unique per parent
-      const childSet = new Set();
-      for (const c of r.children || []) {
-        const ln = Number(c.lineNo);
-        if (!ln) throw new Error(`Child row lineNo missing in SrNo ${sr}`);
-        if (childSet.has(ln))
-          throw new Error(`Child lineNo must be unique in SrNo ${sr}`);
-        childSet.add(ln);
+        // validate child lineNo unique per parent
+        const childSet = new Set();
+        for (const c of r.children || []) {
+          const ln = Number(c.lineNo);
+          if (!ln) throw new Error(`Child row lineNo missing in SrNo ${sr}`);
+          if (childSet.has(ln))
+            throw new Error(`Child lineNo must be unique in SrNo ${sr}`);
+          childSet.add(ln);
+        }
       }
-    }
 
-    // ✅ IMPORTANT: Do NOT send any surcharge fields from frontend
-    const payloadRows = rows.map((r) => {
-      return {
-        id: r.id || null,
-        srNo: Number(r.srNo),
-        description: r.description || "",
-        installmentAmount: Number(r.installmentAmount || 0),
-        dueDate: r.dueDate ? String(r.dueDate).slice(0, 10) : new Date().toISOString().slice(0, 10),
+      // ✅ IMPORTANT: Do NOT send any surcharge fields from frontend
+      const payloadRows = rows.map((r) => {
+        return {
+          id: r.id || null,
+          srNo: Number(r.srNo),
+          description: r.description || "",
+          installmentAmount: Number(r.installmentAmount || 0),
+          dueDate: r.dueDate
+            ? String(r.dueDate).slice(0, 10)
+            : new Date().toISOString().slice(0, 10),
 
-        amountPaid: Number(r.amountPaid || 0),
-        paymentDate: r.paymentDate ? String(r.paymentDate).slice(0, 10) : null,
+          amountPaid: Number(r.amountPaid || 0),
+          paymentDate: r.paymentDate
+            ? String(r.paymentDate).slice(0, 10)
+            : null,
 
-        paymentProof: r.paymentProof ? r.paymentProof : null,
-        instrumentType: r.instrumentType ? r.instrumentType : null,
-        instrumentNo: r.instrumentNo ? r.instrumentNo : null,
+          paymentProof: r.paymentProof ? r.paymentProof : null,
+          instrumentType: r.instrumentType ? r.instrumentType : null,
+          instrumentNo: r.instrumentNo ? r.instrumentNo : null,
 
-        children: (r.children || []).map((c) => ({
-          id: c.id || null,
-          lineNo: Number(c.lineNo),
-          description: c.description || "",
-          amountPaid: Number(c.amountPaid || 0),
-          paymentDate: c.paymentDate ? String(c.paymentDate).slice(0, 10) : null,
-          paymentProof: c.paymentProof ? c.paymentProof : null,
-          instrumentType: c.instrumentType ? c.instrumentType : null,
-          instrumentNo: c.instrumentNo ? c.instrumentNo : null,
-        })),
+          children: (r.children || []).map((c) => ({
+            id: c.id || null,
+            lineNo: Number(c.lineNo),
+            description: c.description || "",
+            amountPaid: Number(c.amountPaid || 0),
+            paymentDate: c.paymentDate
+              ? String(c.paymentDate).slice(0, 10)
+              : null,
+            paymentProof: c.paymentProof ? c.paymentProof : null,
+            instrumentType: c.instrumentType ? c.instrumentType : null,
+            instrumentNo: c.instrumentNo ? c.instrumentNo : null,
+          })),
+        };
+      });
+
+      const payloadContract = {
+        totalAmount: Number(totalAmountEdit || 0),
+        downPayment: Number(downPaymentEdit || 0),
+        possession: Number(possessionPctEdit || 0),
+        months: Number(monthsEdit || 0),
+
+        // ✅ possession info (no surcharge fields here too)
+        possessionDueDate: posDueDate ? posDueDate : null,
+        possessionPaid: Number(posPaid || 0),
+        possessionPaymentDate: posPaymentDate ? posPaymentDate : null,
+        possessionInstrumentType: posInstrumentType ? posInstrumentType : null,
+        possessionInstrumentNo: posInstrumentNo ? posInstrumentNo : null,
+        possessionPaymentProof: posPaymentProof ? posPaymentProof : null,
       };
-    });
 
-    const payloadContract = {
-      totalAmount: Number(totalAmountEdit || 0),
-      downPayment: Number(downPaymentEdit || 0),
-      possession: Number(possessionPctEdit || 0),
-      months: Number(monthsEdit || 0),
+      const res = await client.put(`/api/admin/ledger/${contractId}`, {
+        rows: payloadRows,
+        contract: payloadContract,
+      });
 
-      // ✅ possession info (no surcharge fields here too)
-      possessionDueDate: posDueDate ? posDueDate : null,
-      possessionPaid: Number(posPaid || 0),
-      possessionPaymentDate: posPaymentDate ? posPaymentDate : null,
-      possessionInstrumentType: posInstrumentType ? posInstrumentType : null,
-      possessionInstrumentNo: posInstrumentNo ? posInstrumentNo : null,
-      possessionPaymentProof: posPaymentProof ? posPaymentProof : null,
-    };
+      // refresh contract + rows from backend (backend is source of truth)
+      if (res?.data?.contract) {
+        const c = res.data.contract;
+        setContract(c);
 
-    const res = await client.put(`/api/admin/ledger/${contractId}`, {
-      rows: payloadRows,
-      contract: payloadContract,
-    });
+        setTotalAmountEdit(
+          Number(c?.totalAmount || payloadContract.totalAmount),
+        );
+        setDownPaymentEdit(
+          Number(c?.downPayment || payloadContract.downPayment),
+        );
+        setPossessionPctEdit(
+          Number(c?.possession || payloadContract.possession),
+        );
+        setMonthsEdit(Number(c?.months || payloadContract.months));
 
-    // refresh contract + rows from backend (backend is source of truth)
-    if (res?.data?.contract) {
-      const c = res.data.contract;
-      setContract(c);
+        setPosDueDate(
+          c?.possessionDueDate
+            ? String(c.possessionDueDate).slice(0, 10)
+            : payloadContract.possessionDueDate || "",
+        );
+        setPosPaid(
+          Number(c?.possessionPaid ?? payloadContract.possessionPaid ?? 0),
+        );
+        setPosPaymentDate(
+          c?.possessionPaymentDate
+            ? String(c.possessionPaymentDate).slice(0, 10)
+            : payloadContract.possessionPaymentDate || "",
+        );
+        setPosInstrumentType(
+          c?.possessionInstrumentType ??
+            payloadContract.possessionInstrumentType ??
+            "",
+        );
+        setPosInstrumentNo(
+          c?.possessionInstrumentNo ??
+            payloadContract.possessionInstrumentNo ??
+            "",
+        );
+        setPosPaymentProof(
+          c?.possessionPaymentProof ??
+            payloadContract.possessionPaymentProof ??
+            "",
+        );
 
-      setTotalAmountEdit(Number(c?.totalAmount || payloadContract.totalAmount));
-      setDownPaymentEdit(Number(c?.downPayment || payloadContract.downPayment));
-      setPossessionPctEdit(Number(c?.possession || payloadContract.possession));
-      setMonthsEdit(Number(c?.months || payloadContract.months));
+        // these bases come from backend (if you keep those fields in DB)
+        setPosSurchargeLockedAmount(
+          Number(c?.possessionSurchargeLockedAmount || 0),
+        );
+        setPosSurchargeCyclesApplied(
+          Number(c?.possessionSurchargeCyclesApplied || 0),
+        );
+        setPosSurchargeLockedBase(
+          Number(c?.possessionSurchargeLockedAmount || 0),
+        );
+        setPosSurchargeCyclesBase(
+          Number(c?.possessionSurchargeCyclesApplied || 0),
+        );
+      } else {
+        setContract((prev) => ({ ...(prev || {}), ...payloadContract }));
+      }
 
-      setPosDueDate(
-        c?.possessionDueDate
-          ? String(c.possessionDueDate).slice(0, 10)
-          : (payloadContract.possessionDueDate || "")
-      );
-      setPosPaid(Number(c?.possessionPaid ?? payloadContract.possessionPaid ?? 0));
-      setPosPaymentDate(
-        c?.possessionPaymentDate
-          ? String(c.possessionPaymentDate).slice(0, 10)
-          : (payloadContract.possessionPaymentDate || "")
-      );
-      setPosInstrumentType(c?.possessionInstrumentType ?? payloadContract.possessionInstrumentType ?? "");
-      setPosInstrumentNo(c?.possessionInstrumentNo ?? payloadContract.possessionInstrumentNo ?? "");
-      setPosPaymentProof(c?.possessionPaymentProof ?? payloadContract.possessionPaymentProof ?? "");
-
-      // these bases come from backend (if you keep those fields in DB)
-      setPosSurchargeLockedAmount(Number(c?.possessionSurchargeLockedAmount || 0));
-      setPosSurchargeCyclesApplied(Number(c?.possessionSurchargeCyclesApplied || 0));
-      setPosSurchargeLockedBase(Number(c?.possessionSurchargeLockedAmount || 0));
-      setPosSurchargeCyclesBase(Number(c?.possessionSurchargeCyclesApplied || 0));
-    } else {
-      setContract((prev) => ({ ...(prev || {}), ...payloadContract }));
+      // ✅ Always set rows from backend
+      setRows(withKeys(res.data.rows || payloadRows));
+      setMsg("Saved successfully ✅");
+    } catch (e) {
+      console.error(e);
+      setMsg(e.response?.data?.error || e.message || "Failed to save");
+    } finally {
+      setSaving(false);
     }
-
-    // ✅ Always set rows from backend
-    setRows(withKeys(res.data.rows || payloadRows));
-    setMsg("Saved successfully ✅");
-  } catch (e) {
-    console.error(e);
-    setMsg(e.response?.data?.error || e.message || "Failed to save");
-  } finally {
-    setSaving(false);
   }
-}
 
-
-    // ---------- TOTALS ----------
+  // ---------- TOTALS ----------
   const totalPayable = Math.round(possessionAmount + monthlyTotal);
 
   // ✅ Paid includes child + possession paid
@@ -1226,27 +1259,25 @@ async function deletePossessionProof() {
   const totalReceivable = Math.max(0, totalPayable - totalPaid);
 
   const totalSurchargeRows = rows.reduce((sum, r) => {
-  const calc = computeRowSurchargeDisplay(r);
-  return sum + Number(calc.surcharge || 0);
-}, 0);
+    const calc = computeRowSurchargeDisplay(r);
+    return sum + Number(calc.surcharge || 0);
+  }, 0);
 
   const posCalcForTotals = computePossessionSurchargeDisplay({
-  possessionAmount,
-  posPaid,
-  posDueDate,
-  posPaymentDate,
-  posSurchargeLockedAmountBase: posSurchargeLockedBase,
-  posSurchargeCyclesBase: posSurchargeCyclesBase,
-});
+    possessionAmount,
+    posPaid,
+    posDueDate,
+    posPaymentDate,
+    posSurchargeLockedAmountBase: posSurchargeLockedBase,
+    posSurchargeCyclesBase: posSurchargeCyclesBase,
+  });
 
-const totalSurcharge = totalSurchargeRows + Number(posCalcForTotals.surcharge || 0);
-
+  const totalSurcharge =
+    totalSurchargeRows + Number(posCalcForTotals.surcharge || 0);
 
   // ✅ IMPORTANT: Total Due should NOT include surcharge
   // (Keep this variable only if you use it somewhere else)
   const totalReceivableWithSurcharge = totalReceivable;
-
-
 
   const navItems = [
     { key: "dashboard", label: "Dashboard", icon: "▦" },
@@ -1272,7 +1303,6 @@ const totalSurcharge = totalSurchargeRows + Number(posCalcForTotals.surcharge ||
   const posProofHref = fileUrl(posPaymentProof);
   const posProofSrc = fileUrl(posPaymentProof);
   const posSurchargeTotal = sumBlocks(posSurchargeBlocks);
-
 
   return (
     <SidebarLayout
@@ -1356,14 +1386,13 @@ const totalSurcharge = totalSurchargeRows + Number(posCalcForTotals.surcharge ||
                   <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
                     <Pill tone="blue">Payable: {fmt(totalPayable)}</Pill>
                     <Pill tone="green">Paid: {fmt(totalPaid)}</Pill>
-                    <Pill tone="orange">Receivable: {fmt(totalReceivable)}</Pill>
+                    <Pill tone="orange">
+                      Receivable: {fmt(totalReceivable)}
+                    </Pill>
                     <Pill tone={totalSurcharge > 0 ? "red" : "purple"}>
                       Surcharge: {fmt(totalSurcharge)}
                     </Pill>
-                    <Pill tone="purple">
-  Total Due: {fmt(totalReceivable)}
-</Pill>
-
+                    <Pill tone="purple">Total Due: {fmt(totalReceivable)}</Pill>
                   </div>
                   <div
                     style={{ color: "#64748b", fontWeight: 700, fontSize: 12 }}
@@ -1552,22 +1581,27 @@ const totalSurcharge = totalSurchargeRows + Number(posCalcForTotals.surcharge ||
                           {rowOrder.map((key) => {
                             // ✅ POSSESSION draggable row (NOW editable + surcharge)
                             if (key === POS_KEY) {
-                              const posCalc = computePossessionSurchargeDisplay({
-  possessionAmount,
-  posPaid,
-  posDueDate,
-  posPaymentDate,
-  posSurchargeLockedAmountBase: posSurchargeLockedBase,
-  posSurchargeCyclesBase: posSurchargeCyclesBase,
-});
+                              const posCalc = computePossessionSurchargeDisplay(
+                                {
+                                  possessionAmount,
+                                  posPaid,
+                                  posDueDate,
+                                  posPaymentDate,
+                                  posSurchargeLockedAmountBase:
+                                    posSurchargeLockedBase,
+                                  posSurchargeCyclesBase:
+                                    posSurchargeCyclesBase,
+                                },
+                              );
 
-const surcharge = Number(posCalc.surcharge || 0);
+                              const surcharge = Number(posCalc.surcharge || 0);
 
-const rowTone =
-  surcharge > 0 ? "#fef2f2" : posCalc.daysLate > 0 ? "#fff7ed" : "transparent";
-
-
-
+                              const rowTone =
+                                surcharge > 0
+                                  ? "#fef2f2"
+                                  : posCalc.daysLate > 0
+                                    ? "#fff7ed"
+                                    : "transparent";
 
                               return (
                                 <SortableRow
@@ -1666,24 +1700,44 @@ const rowTone =
                                   </td>
 
                                   <td
-  style={td({
-    fontWeight: 900,
-    background: rowTone,
-  })}
->
-  {surcharge > 0 ? (
-    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-      <Pill tone={posCalc.previewAdd > 0 ? "orange" : "red"}>
-        {fmt(surcharge)}
-      </Pill>
+                                    style={td({
+                                      fontWeight: 900,
+                                      background: rowTone,
+                                    })}
+                                  >
+                                    {surcharge > 0 ? (
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          gap: 8,
+                                          alignItems: "center",
+                                        }}
+                                      >
+                                        <Pill
+                                          tone={
+                                            posCalc.previewAdd > 0
+                                              ? "orange"
+                                              : "red"
+                                          }
+                                        >
+                                          {fmt(surcharge)}
+                                        </Pill>
 
-      {posCalc.previewAdd > 0 && <Pill tone="blue">Not Saved</Pill>}
-    </div>
-  ) : (
-    <span style={{ color: "#94a3b8", fontWeight: 800 }}>—</span>
-  )}
-</td>
-
+                                        {posCalc.previewAdd > 0 && (
+                                          <Pill tone="blue">Not Saved</Pill>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          color: "#94a3b8",
+                                          fontWeight: 800,
+                                        }}
+                                      >
+                                        —
+                                      </span>
+                                    )}
+                                  </td>
 
                                   <td style={td({ background: rowTone })}>
                                     <div
@@ -1719,38 +1773,46 @@ const rowTone =
                                       </label>
 
                                       {posPaymentProof ? (
-  <>
-    <a
-      href={posProofHref}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        textDecoration: "none",
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: "1px solid #e5e7eb",
-        background: "#ffffff",
-        fontWeight: 900,
-        fontSize: 12,
-        color: "#0f172a",
-      }}
-    >
-      View
-    </a>
+                                        <>
+                                          <a
+                                            href={posProofHref}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                              textDecoration: "none",
+                                              padding: "10px 12px",
+                                              borderRadius: 12,
+                                              border: "1px solid #e5e7eb",
+                                              background: "#ffffff",
+                                              fontWeight: 900,
+                                              fontSize: 12,
+                                              color: "#0f172a",
+                                            }}
+                                          >
+                                            View
+                                          </a>
 
-    <DangerButton
-      onClick={deletePossessionProof}
-      style={{ padding: "10px 12px", fontSize: 12 }}
-    >
-      Delete
-    </DangerButton>
-  </>
-) : (
-  <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
-    No file
-  </span>
-)}
-
+                                          <DangerButton
+                                            onClick={deletePossessionProof}
+                                            style={{
+                                              padding: "10px 12px",
+                                              fontSize: 12,
+                                            }}
+                                          >
+                                            Delete
+                                          </DangerButton>
+                                        </>
+                                      ) : (
+                                        <span
+                                          style={{
+                                            fontSize: 12,
+                                            color: "#64748b",
+                                            fontWeight: 700,
+                                          }}
+                                        >
+                                          No file
+                                        </span>
+                                      )}
                                     </div>
 
                                     {posPaymentProof && (
@@ -1803,22 +1865,21 @@ const rowTone =
                             // ✅ Balance should reflect both
                             const balance = displayBalanceForRow(r);
 
-
                             // ✅ Late days uses latest payment date (parent or child)
                             const payDate = effectivePaymentDate(r);
                             const calc = computeRowSurchargeDisplay(r);
-const lDays = calc.daysLate;
-const surcharge = calc.surcharge;
-
+                            const lDays = calc.daysLate;
+                            const surcharge = calc.surcharge;
 
                             const proofHref = fileUrl(r.paymentProof);
                             const proofSrc = fileUrl(r.paymentProof);
 
                             const rowTone =
-  surcharge > 0 ? "#fef2f2" : lDays > 0 ? "#fff7ed" : "transparent";
-
-
-
+                              surcharge > 0
+                                ? "#fef2f2"
+                                : lDays > 0
+                                  ? "#fff7ed"
+                                  : "transparent";
 
                             const isExpanded = expandedKeys.has(r.__key);
 
@@ -1968,17 +2029,37 @@ const surcharge = calc.surcharge;
                                     })}
                                   >
                                     {surcharge > 0 ? (
-  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-    <Pill tone={calc.previewAdd > 0 ? "orange" : "red"}>
-      {fmt(surcharge)}
-    </Pill>
+                                      <div
+                                        style={{
+                                          display: "flex",
+                                          gap: 8,
+                                          alignItems: "center",
+                                        }}
+                                      >
+                                        <Pill
+                                          tone={
+                                            calc.previewAdd > 0
+                                              ? "orange"
+                                              : "red"
+                                          }
+                                        >
+                                          {fmt(surcharge)}
+                                        </Pill>
 
-    {calc.previewAdd > 0 && <Pill tone="blue">Not Saved</Pill>}
-  </div>
-) : (
-  <span style={{ color: "#94a3b8", fontWeight: 800 }}>—</span>
-)}
-
+                                        {calc.previewAdd > 0 && (
+                                          <Pill tone="blue">Not Saved</Pill>
+                                        )}
+                                      </div>
+                                    ) : (
+                                      <span
+                                        style={{
+                                          color: "#94a3b8",
+                                          fontWeight: 800,
+                                        }}
+                                      >
+                                        —
+                                      </span>
+                                    )}
                                   </td>
 
                                   <td
@@ -2043,38 +2124,48 @@ const surcharge = calc.surcharge;
                                       </label>
 
                                       {r.paymentProof ? (
-  <>
-    <a
-      href={proofHref}
-      target="_blank"
-      rel="noreferrer"
-      style={{
-        textDecoration: "none",
-        padding: "10px 12px",
-        borderRadius: 12,
-        border: "1px solid #e5e7eb",
-        background: "#ffffff",
-        fontWeight: 900,
-        fontSize: 12,
-        color: "#0f172a",
-      }}
-    >
-      View
-    </a>
+                                        <>
+                                          <a
+                                            href={proofHref}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                              textDecoration: "none",
+                                              padding: "10px 12px",
+                                              borderRadius: 12,
+                                              border: "1px solid #e5e7eb",
+                                              background: "#ffffff",
+                                              fontWeight: 900,
+                                              fontSize: 12,
+                                              color: "#0f172a",
+                                            }}
+                                          >
+                                            View
+                                          </a>
 
-    <DangerButton
-      onClick={() => deleteProofForRow(idx)}
-      style={{ padding: "10px 12px", fontSize: 12 }}
-    >
-      Delete
-    </DangerButton>
-  </>
-) : (
-  <span style={{ fontSize: 12, color: "#64748b", fontWeight: 700 }}>
-    No file
-  </span>
-)}
-
+                                          <DangerButton
+                                            onClick={() =>
+                                              deleteProofForRow(idx)
+                                            }
+                                            style={{
+                                              padding: "10px 12px",
+                                              fontSize: 12,
+                                            }}
+                                          >
+                                            Delete
+                                          </DangerButton>
+                                        </>
+                                      ) : (
+                                        <span
+                                          style={{
+                                            fontSize: 12,
+                                            color: "#64748b",
+                                            fontWeight: 700,
+                                          }}
+                                        >
+                                          No file
+                                        </span>
+                                      )}
                                     </div>
 
                                     {r.paymentProof && (
@@ -2270,7 +2361,7 @@ const surcharge = calc.surcharge;
                                                                 lineNo:
                                                                   e.target
                                                                     .value,
-                                                              }
+                                                              },
                                                             )
                                                           }
                                                         />
@@ -2289,7 +2380,7 @@ const surcharge = calc.surcharge;
                                                                 description:
                                                                   e.target
                                                                     .value,
-                                                              }
+                                                              },
                                                             )
                                                           }
                                                         />
@@ -2309,7 +2400,7 @@ const surcharge = calc.surcharge;
                                                                 amountPaid:
                                                                   e.target
                                                                     .value,
-                                                              }
+                                                              },
                                                             )
                                                           }
                                                         />
@@ -2321,7 +2412,7 @@ const surcharge = calc.surcharge;
                                                           value={
                                                             c.paymentDate
                                                               ? String(
-                                                                  c.paymentDate
+                                                                  c.paymentDate,
                                                                 ).slice(0, 10)
                                                               : ""
                                                           }
@@ -2333,7 +2424,7 @@ const surcharge = calc.surcharge;
                                                                 paymentDate:
                                                                   e.target
                                                                     .value,
-                                                              }
+                                                              },
                                                             )
                                                           }
                                                         />
@@ -2353,7 +2444,7 @@ const surcharge = calc.surcharge;
                                                                 instrumentType:
                                                                   e.target
                                                                     .value,
-                                                              }
+                                                              },
                                                             )
                                                           }
                                                         >
@@ -2389,7 +2480,7 @@ const surcharge = calc.surcharge;
                                                                 instrumentNo:
                                                                   e.target
                                                                     .value,
-                                                              }
+                                                              },
                                                             )
                                                           }
                                                         />
@@ -2400,7 +2491,7 @@ const surcharge = calc.surcharge;
                                                           onClick={() =>
                                                             deleteChildRow(
                                                               idx,
-                                                              cidx
+                                                              cidx,
                                                             )
                                                           }
                                                           style={{
@@ -2411,7 +2502,7 @@ const surcharge = calc.surcharge;
                                                         </DangerButton>
                                                       </td>
                                                     </tr>
-                                                  )
+                                                  ),
                                                 )
                                               )}
                                             </tbody>
@@ -2472,17 +2563,16 @@ const surcharge = calc.surcharge;
                         <td style={td({ color: "white" })}></td>
                         <td style={td({ color: "white" })}></td>
                         <td style={td({ fontWeight: 900, color: "white" })}>
-  {fmt(totalReceivable)}
-</td>
+                          {fmt(totalReceivable)}
+                        </td>
 
-<td style={td({ fontWeight: 900, color: "white" })}>
-  {fmt(totalSurcharge)}
-</td>
+                        <td style={td({ fontWeight: 900, color: "white" })}>
+                          {fmt(totalSurcharge)}
+                        </td>
 
-<td style={td({ fontWeight: 900, color: "white" })}>
-  —
-</td>
-
+                        <td style={td({ fontWeight: 900, color: "white" })}>
+                          —
+                        </td>
 
                         <td style={td({ color: "white" })}></td>
                         <td style={td({ color: "white" })}></td>

@@ -11,6 +11,14 @@ const fs = require("fs");
 // ===================== AUTH =====================
 router.use(auth, requireRole("ACQUISITION"));
 
+const LOGO_PATH = path.join(
+  __dirname,
+  "..", // routes -> src
+  "uploads",
+  "payment-proofs",
+  "logoavenue18.png",
+);
+
 // ===================== UPLOAD DIR =====================
 // IMPORTANT: use process.cwd() so it works everywhere (local + server)
 const UPLOAD_DIR = path.join(process.cwd(), "src", "uploads", "payment-proofs");
@@ -89,6 +97,40 @@ function esc(s) {
     .replace(/>/g, "&gt;");
 }
 
+// ✅ Logo -> Data URI (FOR PDF)
+function getLogoDataUri() {
+  try {
+    if (!fs.existsSync(LOGO_PATH)) return ""; // logo missing
+    const buf = fs.readFileSync(LOGO_PATH);
+    const b64 = buf.toString("base64");
+    const ext = path.extname(LOGO_PATH).toLowerCase();
+    const mime =
+      ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : ext === ".webp"
+          ? "image/webp"
+          : "image/png";
+    return `data:${mime};base64,${b64}`;
+  } catch (e) {
+    console.error("LOGO READ ERROR:", e);
+    return "";
+  }
+}
+
+// ✅ Printed Date (Pakistan time)
+function printedDatePK() {
+  const now = new Date();
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Karachi",
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: true,
+  }).format(now);
+}
+
 /* =========================================================
    ✅ DATE HELPERS (FIXED: NO MORE DECREASING ON SAVE)
    Strategy:
@@ -126,7 +168,6 @@ function toDateOnlyAny(d) {
   const s10 = raw.slice(0, 10);
 
   // ✅ 1) Handle DD/MM/YYYY or DD-MM-YYYY safely
-  // Example: "24/09/2025" or "24-09-2025"
   let m = /^(\d{2})[\/-](\d{2})[\/-](\d{4})$/.exec(s10);
   if (m) {
     const day = Number(m[1]);
@@ -145,7 +186,6 @@ function toDateOnlyAny(d) {
   }
 
   // ✅ 3) ISO datetime (has time) -> convert to PK date -> noon UTC
-  // Example: "2025-09-24T00:00:00.000Z"
   if (raw.includes("T")) {
     const parsed = new Date(raw);
     if (!Number.isNaN(parsed.getTime())) {
@@ -428,10 +468,10 @@ router.put("/:contractId", async (req, res) => {
     const existingParentIds = new Set(existingParents.map((x) => x.id));
 
     const incomingParentIds = new Set(
-      normalized.filter((x) => x.id && !Number.isNaN(x.id)).map((x) => x.id)
+      normalized.filter((x) => x.id && !Number.isNaN(x.id)).map((x) => x.id),
     );
     const parentsToDelete = [...existingParentIds].filter(
-      (id) => !incomingParentIds.has(id)
+      (id) => !incomingParentIds.has(id),
     );
 
     await prisma.$transaction(async (tx) => {
@@ -477,7 +517,7 @@ router.put("/:contractId", async (req, res) => {
 
       // update existing parent rows (WITH surcharge lock)
       for (const r of normalized.filter(
-        (x) => x.id && existingParentIds.has(x.id)
+        (x) => x.id && existingParentIds.has(x.id),
       )) {
         const existingDb = await readExistingLockRow(r.id);
         const locked = computeAndLockSurchargeForRow(existingDb, r);
@@ -511,8 +551,12 @@ router.put("/:contractId", async (req, res) => {
 
       for (const r of newParents) {
         const locked = computeAndLockSurchargeForRow(
-          { latePaymentSurcharge: 0, surchargeCyclesApplied: 0, surchargeBalanceBase: null },
-          r
+          {
+            latePaymentSurcharge: 0,
+            surchargeCyclesApplied: 0,
+            surchargeBalanceBase: null,
+          },
+          r,
         );
 
         const created = await tx.ledgerrow.create({
@@ -565,11 +609,11 @@ router.put("/:contractId", async (req, res) => {
         const incomingChildIds = new Set(
           incomingChildren
             .filter((c) => c.id && !Number.isNaN(c.id))
-            .map((c) => c.id)
+            .map((c) => c.id),
         );
 
         const childToDelete = [...existingChildIds].filter(
-          (id) => !incomingChildIds.has(id)
+          (id) => !incomingChildIds.has(id),
         );
 
         if (childToDelete.length > 0) {
@@ -580,7 +624,7 @@ router.put("/:contractId", async (req, res) => {
 
         // update children
         for (const c of incomingChildren.filter(
-          (x) => x.id && existingChildIds.has(x.id)
+          (x) => x.id && existingChildIds.has(x.id),
         )) {
           await tx.ledgerchildrow.update({
             where: { id: c.id },
@@ -685,45 +729,59 @@ router.put("/:contractId", async (req, res) => {
 
 // ===================== UPLOAD PAYMENT PROOF =====================
 // ✅ Returns relative url: /uploads/payment-proofs/xxx.png
-router.post("/:contractId/upload-proof", uploadSingle("file"), async (req, res) => {
-  try {
-    const contractId = Number(req.params.contractId);
-    if (!contractId) return res.status(400).json({ error: "Invalid contractId" });
-    if (!req.file) return res.status(400).json({ error: "File missing" });
+router.post(
+  "/:contractId/upload-proof",
+  uploadSingle("file"),
+  async (req, res) => {
+    try {
+      const contractId = Number(req.params.contractId);
+      if (!contractId)
+        return res.status(400).json({ error: "Invalid contractId" });
+      if (!req.file) return res.status(400).json({ error: "File missing" });
 
-    const rowId = req.body?.rowId ? Number(req.body.rowId) : null;
-    const srNo = req.body?.srNo ? Number(req.body.srNo) : null;
+      const rowId = req.body?.rowId ? Number(req.body.rowId) : null;
+      const srNo = req.body?.srNo ? Number(req.body.srNo) : null;
 
-    const contract = await prisma.contract.findUnique({
-      where: { id: contractId },
-      select: { id: true },
-    });
-    if (!contract) return res.status(404).json({ error: "Contract not found" });
-
-    const publicUrl = `/uploads/payment-proofs/${req.file.filename}`;
-
-    if (rowId) {
-      // ✅ safety: ensure row belongs to this contract
-      const row = await prisma.ledgerrow.findUnique({ where: { id: rowId }, select: { contractId: true } });
-      if (!row || row.contractId !== contractId) return res.status(400).json({ error: "Row does not belong to this contract" });
-
-      await prisma.ledgerrow.update({
-        where: { id: rowId },
-        data: { paymentProof: publicUrl },
+      const contract = await prisma.contract.findUnique({
+        where: { id: contractId },
+        select: { id: true },
       });
-    } else if (srNo) {
-      await prisma.ledgerrow.update({
-        where: { contractId_srNo: { contractId, srNo } },
-        data: { paymentProof: publicUrl },
-      });
+      if (!contract)
+        return res.status(404).json({ error: "Contract not found" });
+
+      const publicUrl = `/uploads/payment-proofs/${req.file.filename}`;
+
+      if (rowId) {
+        // ✅ safety: ensure row belongs to this contract
+        const row = await prisma.ledgerrow.findUnique({
+          where: { id: rowId },
+          select: { contractId: true },
+        });
+        if (!row || row.contractId !== contractId)
+          return res
+            .status(400)
+            .json({ error: "Row does not belong to this contract" });
+
+        await prisma.ledgerrow.update({
+          where: { id: rowId },
+          data: { paymentProof: publicUrl },
+        });
+      } else if (srNo) {
+        await prisma.ledgerrow.update({
+          where: { contractId_srNo: { contractId, srNo } },
+          data: { paymentProof: publicUrl },
+        });
+      }
+
+      return res.json({ ok: true, url: publicUrl });
+    } catch (e) {
+      console.error(e);
+      return res
+        .status(500)
+        .json({ error: e.message || "Failed to upload proof" });
     }
-
-    return res.json({ ok: true, url: publicUrl });
-  } catch (e) {
-    console.error(e);
-    return res.status(500).json({ error: e.message || "Failed to upload proof" });
-  }
-});
+  },
+);
 
 // ===================== DELETE PAYMENT PROOF =====================
 router.delete("/:contractId/delete-proof", async (req, res) => {
@@ -808,8 +866,7 @@ router.delete("/:contractId/delete-proof", async (req, res) => {
   }
 });
 
-
-// ===================== PDF EXPORT (PARENTS ONLY) =====================
+// ===================== PDF EXPORT (PARENTS + CHILD ROWS) =====================
 router.get("/:contractId/export/pdf", async (req, res) => {
   let browser;
   try {
@@ -822,51 +879,84 @@ router.get("/:contractId/export/pdf", async (req, res) => {
       include: {
         user: true,
         unit: true,
-        ledgerrow: { orderBy: { srNo: "asc" } },
+        ledgerrow: {
+          orderBy: { srNo: "asc" },
+          include: { children: { orderBy: { lineNo: "asc" } } }, // ✅ include children
+        },
       },
     });
     if (!contract) return res.status(404).json({ error: "Contract not found" });
 
-    const installments = (contract.ledgerrow || []).map((r) => {
+    // ✅ parent + children for print
+    const printableRows = (contract.ledgerrow || []).map((r) => {
       const inst = Number(r.installmentAmount || 0);
-      const paid = Number(r.amountPaid || 0);
-      const balance = Math.max(0, inst - paid);
+      const parentPaid = Number(r.amountPaid || 0);
+      const childPaid = (r.children || []).reduce(
+        (s, c) => s + Number(c.amountPaid || 0),
+        0,
+      );
 
-      const lDays = lateDaysBetween(r.dueDate, null);
+      const totalPaidRow = parentPaid + childPaid; // ✅ show total paid on parent row
+      const balance = Math.max(0, inst - totalPaidRow);
+
       const surcharge = Number(r.latePaymentSurcharge || 0);
 
+      // ✅ latest payment date (parent + children)
+      const latestPay = effectivePaymentDate(r);
+
+      // ✅ if any payment happened -> show due→latestPay
+      // ✅ else -> show due→today
+      const lateDays = latestPay
+        ? lateDaysBetween(r.dueDate, latestPay)
+        : lateDaysBetween(r.dueDate, null);
+
       return {
-        srNo: r.srNo,
-        description: r.description || "",
-        installmentAmount: inst,
-        dueDate: r.dueDate ? fmtDMY(r.dueDate) : "",
-        amountPaid: paid,
-        paymentDate: r.paymentDate ? fmtDMY(r.paymentDate) : "",
-        instrumentType: r.instrumentType || "",
-        instrumentNo: r.instrumentNo || "",
-        balance,
-        surcharge,
-        lateDays: lDays,
+        parent: {
+          srNo: r.srNo,
+          description: r.description || "",
+          installmentAmount: inst,
+          dueDate: r.dueDate ? fmtDMY(r.dueDate) : "",
+          amountPaid: totalPaidRow,
+          paymentDate: r.paymentDate ? fmtDMY(r.paymentDate) : "",
+          instrumentType: r.instrumentType || "",
+          instrumentNo: r.instrumentNo || "",
+          balance,
+          surcharge,
+          lateDays,
+        },
+        children: (r.children || []).map((c) => ({
+          lineNo: c.lineNo,
+          description: c.description || "Partial Payment",
+          amountPaid: Number(c.amountPaid || 0),
+          paymentDate: c.paymentDate ? fmtDMY(c.paymentDate) : "",
+          instrumentType: c.instrumentType || "",
+          instrumentNo: c.instrumentNo || "",
+        })),
       };
     });
 
-    const totalPayable = installments.reduce(
-      (s, r) => s + Number(r.installmentAmount || 0),
-      0
+    // ✅ totals (include children)
+    const totalPayable = printableRows.reduce(
+      (s, x) => s + Number(x.parent.installmentAmount || 0),
+      0,
     );
-    const totalPaid = installments.reduce(
-      (s, r) => s + Number(r.amountPaid || 0),
-      0
+    const totalPaid = printableRows.reduce(
+      (s, x) => s + Number(x.parent.amountPaid || 0),
+      0,
     );
-    const totalReceivable = installments.reduce(
-      (s, r) => s + Number(r.balance || 0),
-      0
+    const totalReceivable = printableRows.reduce(
+      (s, x) => s + Number(x.parent.balance || 0),
+      0,
     );
-    const totalSurcharge = installments.reduce(
-      (s, r) => s + Number(r.surcharge || 0),
-      0
+    const totalSurcharge = printableRows.reduce(
+      (s, x) => s + Number(x.parent.surcharge || 0),
+      0,
     );
     const totalReceivableWithSurcharge = totalReceivable + totalSurcharge;
+
+    // ✅ logo + printed date
+    const logo = getLogoDataUri();
+    const printedOn = printedDatePK();
 
     const html = `<!doctype html>
 <html>
@@ -875,20 +965,41 @@ router.get("/:contractId/export/pdf", async (req, res) => {
   <style>
     @page { size: A4 landscape; margin: 10mm; }
     body { font-family: Arial, sans-serif; color:#0f172a; }
+
     .header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom: 8px; }
+    .logoBox { width: 180px; }
+    .logo { height: 55px; object-fit: contain; }
+    .spacer { width: 180px; }
+
     .titleWrap { flex:1; text-align:center; }
     .titleTop { font-weight:800; font-size:18px; margin:0; }
     .titleMid { font-weight:800; font-size:16px; margin:14px 0 0; letter-spacing:0.4px; }
+    .printed { margin-top: 6px; font-size: 12px; font-weight: 700; }
+
     .metaTable { width:100%; border-collapse:collapse; margin-top:8px; font-size:12px; }
     .metaTable td { padding:6px 8px; border-bottom:1px solid #0f172a; }
     .metaLabel { font-weight:700; width:120px; }
+
     table.ledger { width:100%; border-collapse:collapse; font-size:11px; margin-top:12px; }
     .ledger th { background:#0f172a; color:white; text-align:left; padding:7px 8px; border:1px solid #0f172a; white-space:nowrap; }
     .ledger td { padding:7px 8px; border:1px solid #e5e7eb; vertical-align:top; }
     .right { text-align:right; white-space:nowrap; }
+
     .zebra:nth-child(even) td { background:#fbfdff; }
     .rowWarn td { background:#fff7ed; }
     .rowBad td { background:#fef2f2; }
+
+    /* ✅ Child rows styling */
+    .childRow td{
+      font-size: 10px;
+      background: #f8fafc;
+      border-color: #e2e8f0;
+    }
+    .childDesc{
+      padding-left: 20px !important;
+      font-style: italic;
+    }
+
     .totalFooter td{
       color:#ffffff !important;
       font-weight:900;
@@ -899,10 +1010,17 @@ router.get("/:contractId/export/pdf", async (req, res) => {
 </head>
 <body>
   <div class="header">
+    <div class="logoBox">
+      ${logo ? `<img src="${logo}" class="logo" />` : ""}
+    </div>
+
     <div class="titleWrap">
       <div class="titleTop">Client Ledger</div>
       <div class="titleMid">ACCOUNT STATEMENT</div>
+      <div class="printed">Printed Date: ${esc(printedOn)}</div>
     </div>
+
+    <div class="spacer"></div>
   </div>
 
   <table class="metaTable">
@@ -915,8 +1033,8 @@ router.get("/:contractId/export/pdf", async (req, res) => {
     <tr>
       <td class="metaLabel">Unit</td>
       <td>${esc(contract.unit?.unitNumber || "")} (${esc(
-      contract.unit?.unitType || ""
-    )})</td>
+        contract.unit?.unitType || "",
+      )})</td>
       <td class="metaLabel">Project</td>
       <td>${esc(contract.unit?.project || "")}</td>
     </tr>
@@ -946,28 +1064,54 @@ router.get("/:contractId/export/pdf", async (req, res) => {
     </thead>
 
     <tbody>
-      ${installments
-        .map((r) => {
-          const lDays = Number(r.lateDays || 0);
-          const surcharge = Number(r.surcharge || 0);
+      ${printableRows
+        .map(({ parent, children }) => {
+          const lDays = Number(parent.lateDays || 0);
+          const surcharge = Number(parent.surcharge || 0);
+
           const trClass =
             surcharge > 0 ? "rowBad" : lDays > 0 ? "rowWarn" : "zebra";
+
           const lateDaysCell = lDays > 0 ? `${lDays} day(s)` : "—";
           const surchargeCell = surcharge > 0 ? fmt(surcharge) : "—";
-          return `
-          <tr class="${trClass}">
-            <td>${r.srNo || ""}</td>
-            <td>${esc(r.description || "")}</td>
-            <td class="right">${fmt(r.installmentAmount)}</td>
-            <td>${r.dueDate || ""}</td>
-            <td class="right">${fmt(r.amountPaid)}</td>
-            <td>${r.paymentDate || ""}</td>
-            <td>${esc(r.instrumentType || "")}</td>
-            <td>${esc(r.instrumentNo || "")}</td>
-            <td class="right">${fmt(r.balance)}</td>
-            <td class="right">${surchargeCell}</td>
-            <td class="right">${lateDaysCell}</td>
-          </tr>`;
+
+          const parentRowHtml = `
+            <tr class="${trClass}">
+              <td>${parent.srNo || ""}</td>
+              <td>${esc(parent.description || "")}</td>
+              <td class="right">${fmt(parent.installmentAmount)}</td>
+              <td>${parent.dueDate || ""}</td>
+              <td class="right">${fmt(parent.amountPaid)}</td>
+              <td>${parent.paymentDate || ""}</td>
+              <td>${esc(parent.instrumentType || "")}</td>
+              <td>${esc(parent.instrumentNo || "")}</td>
+              <td class="right">${fmt(parent.balance)}</td>
+              <td class="right">${surchargeCell}</td>
+              <td class="right">${lateDaysCell}</td>
+            </tr>
+          `;
+
+          const childRowsHtml = (children || [])
+            .map(
+              (c) => `
+              <tr class="childRow">
+                <td>${parent.srNo}.${c.lineNo}</td>
+                <td class="childDesc">↳ ${esc(c.description || "")}</td>
+                <td class="right">—</td>
+                <td>—</td>
+                <td class="right">${fmt(c.amountPaid)}</td>
+                <td>${c.paymentDate || ""}</td>
+                <td>${esc(c.instrumentType || "")}</td>
+                <td>${esc(c.instrumentNo || "")}</td>
+                <td class="right">—</td>
+                <td class="right">—</td>
+                <td class="right">—</td>
+              </tr>
+            `,
+            )
+            .join("");
+
+          return parentRowHtml + childRowsHtml;
         })
         .join("")}
 
@@ -983,7 +1127,7 @@ router.get("/:contractId/export/pdf", async (req, res) => {
         <td class="right" style="font-weight:900;">${fmt(totalReceivable)}</td>
         <td class="right" style="font-weight:900;">${fmt(totalSurcharge)}</td>
         <td class="right" style="font-weight:900;">${fmt(
-          totalReceivableWithSurcharge
+          totalReceivableWithSurcharge,
         )}</td>
       </tr>
     </tbody>
@@ -1010,7 +1154,7 @@ router.get("/:contractId/export/pdf", async (req, res) => {
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(
       "Content-Disposition",
-      `attachment; filename="ledger-contract-${contractId}.pdf"`
+      `attachment; filename="ledger-contract-${contractId}.pdf"`,
     );
     return res.end(pdf);
   } catch (e) {

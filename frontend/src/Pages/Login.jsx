@@ -66,12 +66,9 @@ export default function Login({ setSession }) {
           <img src={logo} alt="Makkaan Developments" style={styles.logo} />
 
           <h1 style={styles.title} className="login-title">
-            Welcome Back
+            Login
           </h1>
-
-          <p style={styles.subtitle}>
-            Login to manage your real estate operations
-          </p>
+          <br></br>
 
           <form onSubmit={handleSubmit} style={styles.form}>
             <label style={styles.label}>Email Address</label>
@@ -97,13 +94,6 @@ export default function Login({ setSession }) {
             <button type="submit" style={styles.button} disabled={loading}>
               {loading ? "Logging in..." : "Login"}
             </button>
-
-            <div style={styles.createRow}>
-              <span style={styles.createText}>New here?</span>
-              <Link to="/register" style={styles.createLink}>
-                Create account
-              </Link>
-            </div>
 
             <div style={styles.footer}>
               © {new Date().getFullYear()} Makkaan Developments
@@ -152,8 +142,7 @@ const styles = {
     padding: "18px",
     background:
       "radial-gradient(1200px 600px at 20% 10%, #eef3ff 0%, #f5f7ff 35%, #eef2ff 100%)",
-    fontFamily:
-      "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
+    fontFamily: "system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif",
   },
 
   card: {
@@ -262,12 +251,5 @@ const styles = {
     backgroundPosition: "center",
     backgroundRepeat: "no-repeat",
     borderRadius: "0 22px 22px 0",
-  },
-
-  rightOverlay: {
-    position: "absolute",
-    inset: 0,
-    background:
-      "linear-gradient(135deg, rgba(59,130,246,0.20), rgba(109,40,217,0.45))",
   },
 };
